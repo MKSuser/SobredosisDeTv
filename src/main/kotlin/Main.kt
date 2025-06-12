@@ -1,279 +1,274 @@
-package ar.edu.algo2
+package ar.edu.unsam.algo2.sobredosistv
 
 import java.time.DayOfWeek
 import java.time.LocalDate
 import kotlin.random.Random
 
-class GrillaDeProgramas() {
-    val programas: MutableList<Programa> = mutableListOf()
 
-    fun agregarPrograma(programa: Programa) {
-        programas.add(programa)
+/***************************************************************************************************************/
+class Programa {
+    var titulo = ""
+    var presentadores = mutableListOf<Presentador>()
+    var presupuesto = 10000
+    var sponsors = mutableListOf<String>()
+    var dias = mutableListOf<DayOfWeek>()
+    var duracion: Int = 30
+    val ratings = mutableListOf<Rating>()
+
+    val restricciones = mutableListOf<RestriccionPrograma>()
+
+    fun revisar(grilla: Grilla) {
+        val primeraRestriccion = restricciones.find { restriccion -> !restriccion.seCumple(this) }
+
+        primeraRestriccion?.ejecutarAcciones(this, grilla)
     }
 
-    fun removerPrograma(programa: Programa) {
-        programas.remove(programa)
-    }
+    fun promedioDeRatings() = ratings.sortedBy { it.fecha }
+        .takeLast(5)
+        .map { it.valor }
+        .average()
 
-    /***********************************************************************************/
-    // Strategy
+    fun conducidoPor(nombrePresentador: String) =
+        presentadores.any { presentador -> presentador.nombre == nombrePresentador }
 
-    lateinit var restriccion: Restriccion
+    fun mitadPresentadores() = presentadores.take(presentadores.size / 2)
 
-    fun mantenerPrograma(programa: Programa): Boolean {
-         return restriccion.condicion(programa)
-    }
+    fun segundaMitadPresentadores() =
+        presentadores.minus(mitadPresentadores().toSet())
 
-    /***********************************************************************************/
-    //Commands
+    fun mitadPresupuesto() = presupuesto / 2
 
-    val accionesATomar: MutableList<Accion> = mutableListOf()
+    fun tituloEnPalabras() = titulo.split(" ")
 
-    fun correrAccionesSobre(programa: Programa){
-        accionesATomar.forEach { it.ejecutar(programa, this) }
-    }
+    fun presentadorPrincipal(): Presentador = presentadores[0]
 
-    /***********************************************************************************/
-    //Observers
+    fun mailsConductores() = presentadores.map { it.email }
 
-    // HASTA ACAAAA
-
-    fun accionesSiNoSeCumplenRestricciones(){
-    }
-
-
+    fun cantidadConductores() = presentadores.size
 }
 
-/***********************************************************************************/
-//Commands
+/************************/
+data class Rating(val valor: Double, val fecha: LocalDate)
 
-interface Accion {
-    fun ejecutar(programa: Programa, grilla: GrillaDeProgramas)
-}
-/**************************/
-class PartirProgramaEnDos: Accion{
-    override fun ejecutar(programa: Programa, grilla: GrillaDeProgramas) {
-        /*Mitad de los conductores*/
-        val conductores = programa.conductoresPrincipales
-        val medioDeConductores = conductores.size / 2
+data class Presentador(val nombre: String, val email: String)
 
-        val conductoresPrimerPrograma = conductores.take(medioDeConductores)
-        val conductoresSegundoPrograma = conductores.drop(medioDeConductores)
+/***************************************************************************************************************/
+abstract class RestriccionPrograma {
+    val acciones = mutableListOf<AccionRevisionPrograma>()
 
-        /*mitad de presupuesto*/
-        val presupuesto = programa.presupuestoBase
-        val presupuestoParaProgramas = presupuesto / 2
+    abstract fun seCumple(programa: Programa): Boolean
 
-        /*Mismos Sponsors*/
-        val sponsors = programa.sponsorsDePublicidad
-
-        /*mitad de duracion*/
-        val mitadDeDuracion = programa.duracionMinutos / 2
-
-        /*mitad del nombre --> si hay una palabra, el segundo sin nombre*/
-        val palabras = programa.titulo.split(" ").filter { it.isNotEmpty() }
-
-        val titulo1 = "${palabras[0]} en el aire!"
-        val titulo2 = if (palabras.size > 1) palabras[1].replaceFirstChar { it.uppercase() } else "Programa sin nombre"
-
-        /*mismos días*/
-        val diaDeTransmision = programa.diaTransmision
-
-        /**Borramos y Creamos los nuevos programas**/
-        grilla.removerPrograma(programa)
-
-        grilla.agregarPrograma(ProgramFactory.crear(
-            conductoresSegundoPrograma.toMutableSet(),
-            presupuestoParaProgramas,
-            sponsors.toMutableSet(),
-            mitadDeDuracion,
-            titulo2
-            ,diaDeTransmision)
-        )
-
-        grilla.agregarPrograma(ProgramFactory.crear(
-            conductoresPrimerPrograma.toMutableSet(),
-            presupuestoParaProgramas,
-            sponsors.toMutableSet(),
-            mitadDeDuracion,
-            titulo1
-            ,diaDeTransmision)
-        )
-
-
+    fun ejecutarAcciones(programa: Programa, grilla: Grilla) {
+        acciones.forEach { accion ->
+            accion.ejecutar(programa, grilla) }
     }
 }
 
-object ProgramFactory{
-    fun crear(conductores: MutableSet<Conductor>,
-              presupuesto: Double,
-              sponsors: MutableSet<Sponsor>,
-              duracion: Double,
-              tituloNuevo: String,
-              diaDeTransmision: DayOfWeek): Programa{
-        return Programa().apply{
-            titulo = tituloNuevo
-            conductoresPrincipales = conductores
-            presupuestoBase = presupuesto
-            sponsorsDePublicidad = sponsors
-            duracionMinutos = duracion
-            diaTransmision = diaDeTransmision
+class MinimoRating(var promedioMinimo: Double) : RestriccionPrograma() {
+    override fun seCumple(programa: Programa) =
+        programa.promedioDeRatings() > promedioMinimo
+}
+
+class MaximoDeConductoresPrincipales(val cantidadMaxima: Int) : RestriccionPrograma(){
+    override fun seCumple(programa: Programa) =
+        programa.cantidadConductores() <= cantidadMaxima
+}
+
+class PresentadorEspecifico(val nombrePresentador: String) : RestriccionPrograma() {
+    override fun seCumple(programa: Programa) =
+        programa.conducidoPor(nombrePresentador)
+
+}
+
+class NoExcederPresupuesto(val presupuestoDeseado: Double): RestriccionPrograma(){
+    override fun seCumple(programa: Programa) =
+        programa.presupuesto <= presupuestoDeseado
+}
+
+class RestriccionOrCompuesta(val restricciones: List<RestriccionPrograma>) : RestriccionPrograma() {
+    override fun seCumple(programa: Programa) =
+        restricciones.any { it.seCumple(programa) }
+}
+
+class RestriccionAndCompuesta(val restricciones: List<RestriccionPrograma>) : RestriccionPrograma() {
+    override fun seCumple(programa: Programa) =
+        restricciones.all { it.seCumple(programa) }
+}
+
+class RestriccionVacia(): RestriccionPrograma(){
+    override fun seCumple(programa: Programa) =
+        true//Null Object Pattern
+}
+
+/***************************************************************************************************************/
+interface AccionRevisionPrograma {
+    fun ejecutar(programa: Programa, grilla: Grilla)
+}
+
+/************************/
+class PartirProgramaEn2 : AccionRevisionPrograma {
+    override fun ejecutar(programa: Programa, grilla: Grilla) {
+        val mitadPresentadores = programa.mitadPresentadores()
+
+        val programa1 = Programa().apply {
+            presentadores = mitadPresentadores.toMutableList()
+            presupuesto = programa.mitadPresupuesto()
+            sponsors = programa.sponsors
+            titulo = "${programa.tituloEnPalabras()[0]} en el aire!"
+            dias = programa.dias
         }
+
+        val otraMitadPresentadores = programa.segundaMitadPresentadores()
+
+        val programa2 = Programa().apply {
+            presentadores = otraMitadPresentadores.toMutableList()
+            presupuesto = programa.mitadPresupuesto()
+            sponsors = programa.sponsors
+            titulo = programa.tituloEnPalabras().getOrNull(1) ?: "Programa sin nombre"
+            dias = programa.dias
+        }
+
+        grilla.eliminarPrograma(programa)
+        grilla.agregarPrograma(programa1)
+        grilla.agregarPrograma(programa2)
     }
 }
-/**************************/
-class CambioPorLosSimpson:Accion{
-    override fun ejecutar(programa: Programa, grilla: GrillaDeProgramas) {
-        /*Crear un programa de los simpson que herede dias y duracion en minutos*/
-        val programaReemplazador = SimpsoncFactory.crear(programa)
 
-        grilla.removerPrograma(programa)
+/************************/
+class CambioPorLosSimpson:AccionRevisionPrograma{
+    override fun ejecutar(programa: Programa, grilla: Grilla) {
+
+        val programaReemplazador = Programa().apply {
+            titulo = "Los Simpsons"
+            dias = programa.dias
+            duracion = programa.duracion
+        }
+
+        grilla.eliminarPrograma(programa)
         grilla.agregarPrograma(programaReemplazador)
     }
 }
 
-object SimpsoncFactory{
-    fun crear(programa: Programa): Programa{
-        return Programa().apply{
-            titulo = "Los Simpson"
-            diaTransmision = programa.diaTransmision
-            duracionMinutos = programa.duracionMinutos
+/************************/
+class FusionarPrograma : AccionRevisionPrograma {
+    override fun ejecutar(programa: Programa, grilla: Grilla) {
+        val siguientePrograma = grilla.siguientePrograma(programa)
+
+        val nuevoPrograma = Programa().apply {
+
+            presentadores = mutableListOf(programa.presentadorPrincipal(), siguientePrograma.presentadorPrincipal())
+            presupuesto = Math.min(programa.presupuesto, siguientePrograma.presupuesto)
+            sponsors = elegirPrograma(programa, siguientePrograma).sponsors
+            duracion = programa.duracion + siguientePrograma.duracion
+            titulo = elegirTitulo()
+            dias = programa.dias
+        }
+
+        grilla.eliminarPrograma(programa)
+        grilla.eliminarPrograma(siguientePrograma)
+        grilla.agregarPrograma(nuevoPrograma)
+    }
+
+    fun elegirPrograma(programa: Programa, otroPrograma: Programa) =
+        if (caraOCruz()) programa else otroPrograma
+
+    fun elegirTitulo() =
+        if (caraOCruz()) "Impacto total" else "Un buen día"
+
+    private fun caraOCruz() =
+        Random.nextBoolean()
+
+}
+
+/***************************************************************************************************************/
+class Grilla {
+    val programas = mutableListOf<Programa>()
+    val programasEnRevision = mutableListOf<Programa>()
+    val observersNuevoPrograma = mutableListOf<ObserverNuevoPrograma>()
+
+    fun procesoDeRevision() {
+        programasEnRevision.forEach { programa -> programa.revisar(this) }
+    }
+
+    fun agregarPrograma(programa: Programa) {
+        programas.add(programa)
+        observersNuevoPrograma.forEach { it.notificarNuevoPrograma(programa, this) }
+    }
+
+    fun eliminarPrograma(programa: Programa) {
+        programas.remove(programa) }
+
+    fun agregarProgramaEnRevision(programa: Programa) {
+        programasEnRevision.add(programa) }
+
+    fun siguientePrograma(programa: Programa): Programa {
+        val indicePrograma = programas.indexOf(programa)
+
+        return if (programas.size > indicePrograma)
+            programas[indicePrograma + 1] else programas[0]
+    }
+
+    fun sincronizarProgramasEnRevision() {
+        programasEnRevision.removeAll { programaEnRevision ->
+            !programas.contains(programaEnRevision) }
+    }
+}
+/***************************************************************************************************************/
+interface ObserverNuevoPrograma {
+    fun notificarNuevoPrograma(programa: Programa, grilla: Grilla)
+}
+
+/************************/
+class NotificarConductoresNuevoPrograma : ObserverNuevoPrograma {
+    lateinit var mailSender: MailSender
+
+    override fun notificarNuevoPrograma(programa: Programa, grilla: Grilla) {
+        programa.mailsConductores().forEach {
+            mailSender.sendMail(Mail(
+                from = "programacion@canal.tv",
+                to = it,
+                subject = "Oportunidad!",
+                content = "Fuiste seleccionado para conducir ${programa.titulo}! Ponete en contacto con la gerencia."))
         }
     }
 }
-/**************************/
-class FusionDeProgramas:Accion{
-    override fun ejecutar(programa: Programa, grilla: GrillaDeProgramas) {
-        val programas = grilla.programas
+/************************/
+interface MailSender {
+    fun sendMail(mail: Mail)
+}
 
-        /*Fusión con el siguiente o el primero*/
-        val indiceDePrograma1 = programas.indexOf(programa)
+data class Mail(val from: String, val to: String, val subject: String, val content: String)
 
-        val programa1 = programa
-        val programa2 = if (indiceDePrograma1 != programas.lastIndex) {
-            programas[indiceDePrograma1 + 1]
-        } else {
-            programas[0]
+/************************/
+class EnviarSMSACliowinPorPresupuestoAlto(val smsSender: SMSSender) : ObserverNuevoPrograma {
+    val presupuestoEstipulado: Int = 100_000
+    val telefonoCliowin: String = "0987654321"
+    val telefonoEmisor: String = "1234567890"
+
+    override fun notificarNuevoPrograma(programa: Programa, grilla: Grilla) {
+
+        if (programa.presupuesto > presupuestoEstipulado){
+            smsSender.sendSMS(SMS(
+                emisor = telefonoEmisor,
+                receptor = telefonoCliowin,
+                mensaje = "{${programa.presupuesto}} - {${programa.titulo}} - CONSEGUIR SPONSOR URGENTE"
+            )
+            )
         }
-
-        /*Conduce el primero de la lista de cada uno, borrar el resto*/
-        val conductores = mutableSetOf(
-            programa1.conductoresPrincipales.first(),
-            programa2.conductoresPrincipales.first()
-        )
-
-        /*presupuesto como el menor de los 2*/
-        val presupuesto = minOf(programa1.presupuestoBase, programa2.presupuestoBase)
-
-        /*Mismo sponsor al azar*/
-        val sponsors = if (Random.nextBoolean()) programa1.sponsorsDePublicidad else programa2.sponsorsDePublicidad
-
-        /*Duracion: suma de ambos*/
-        val duracion = programa1.duracionMinutos + programa2.duracionMinutos
-
-        /* Los días serán los del primer programa*/
-        val diaDeTransmision = programa1.diaTransmision
-
-        /* titulo al azar, entre "Impacto total" o "Un buen día"*/
-        val titulo = if (Random.nextBoolean()) "Impacto total" else "Un buen día"
-
-        grilla.removerPrograma(programa1)
-        grilla.removerPrograma(programa2)
-
-        grilla.agregarPrograma(ProgramFactory.crear(
-            conductores.toMutableSet(),
-            presupuesto,
-            sponsors.toMutableSet(),
-            duracion,
-            titulo
-            ,diaDeTransmision)
-        )
     }
 }
 
-/**************************/
-class CambioDeDia(val nuevoDia: DayOfWeek):Accion{
-    override fun ejecutar(programa: Programa, grilla: GrillaDeProgramas) {
-        /*Se pasa a otro día*/
-        programa.diaTransmision = nuevoDia
+/************************/
+interface SMSSender {
+    fun sendSMS(sms: SMS)
+}
+
+data class SMS(val emisor: String, val receptor: String, val mensaje: String)
+
+/************************/
+class QuitarProgramasEliminadosEnRevision : ObserverNuevoPrograma {
+    override fun notificarNuevoPrograma(programa: Programa, grilla: Grilla) {
+        grilla.sincronizarProgramasEnRevision()
     }
 }
 
-/***********************************************************************************/
-//Strategy
-
-interface Restriccion {
-    fun condicion(programa: Programa):Boolean
-}
-
-class PromedioRating (val ratingASuperar: Double): Restriccion{
-    override fun condicion(programa: Programa) =
-        programa.ratingDeUltimas5Emisiones().average() >= ratingASuperar
-}
-
-class MaximoDeConductoresPrincipales(val cantidadMaxima: Int): Restriccion{
-    override fun condicion(programa: Programa) =
-        programa.conductoresPrincipales.size <= cantidadMaxima
-}
-
-class ConductorPrincipalDeseado(val conductorDeseado: Conductor): Restriccion{
-    override fun condicion(programa: Programa) =
-        programa.conductoresPrincipales.contains(conductorDeseado)
-}
-
-class NoExcederPresupuesto(val presupuestoDeseado: Double): Restriccion{
-    override fun condicion(programa: Programa) =
-       programa.presupuestoBase <= presupuestoDeseado
-}
-
-class RestriccionAnd(val restricciones: List<Restriccion>): Restriccion{
-    override fun condicion(programa:Programa) =
-       restricciones.all { it.condicion(programa) }
-}
-
-class RestriccionOr(val restricciones: List<Restriccion>): Restriccion{
-    override fun condicion(programa:Programa) =
-        restricciones.any { it.condicion(programa) }
-}
-
-class RestriccionVacia(): Restriccion{
-    override fun condicion(programa:Programa) =
-        true//Null Object Pattern
-}
-
-class RestriccionNoCumplidaException: Exception(){}
-
-/***********************************************************************************/
-//Observers
-
-
-
-
-/***********************************************************************************/
-
-
-class Programa {
-    var titulo: String = ""
-    lateinit var diaTransmision: DayOfWeek
-    var duracionMinutos: Double = 0.0
-    var conductoresPrincipales: MutableSet<Conductor> = mutableSetOf()
-    var presupuestoBase: Double = 0.0
-    var sponsorsDePublicidad: MutableSet<Sponsor> = mutableSetOf()
-    val emisiones: MutableList<Emision> = mutableListOf()
-
-    fun ratingDeUltimas5Emisiones(): List<Double> {
-        return emisiones.map { it.rating }.takeLast(5)
-    }
-
-}
-
-data class Emision(
-    val fecha: LocalDate,
-    val rating: Double
-)
-
-class Sponsor (val nombre: String){
-}
-
-class Conductor (val nombre: String) {
-}
