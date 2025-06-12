@@ -7,8 +7,8 @@
 
 > **Dónde se ve:**
 
-* `RestriccionPrograma` y sus subclases (`MinimoRating`, `NoExcederPresupuesto`, etc.)
-* `AccionRevisionPrograma` y sus implementaciones (`PartirProgramaEn2`, `FusionarPrograma`, etc.)
+* `RestriccionPrograma` y sus subclases (`MinimoRating`, `NoExcederPresupuesto`, etc.) -permite desacoplar el algoritmo de restricción-
+* `AccionRevisionPrograma` y sus implementaciones (`PartirProgramaEn2`, `FusionarPrograma`, etc.) -permite desacoplar el algoritmo de acciones a tomar por cada restricción-
 
 > **Por qué lo usamos:**
 > Nos permite encapsular distintas restricciones y acciones intercambiables sin modificar el código del `Programa` o de la `Grilla`.
@@ -113,20 +113,8 @@ Cada objeto conoce solo lo necesario. No vemos cadenas de llamadas como `program
 
 ---
 
-### 🔷 **4. Extensibilidad y Mantenibilidad**
-
-> * Podés agregar restricciones con solo crear nuevas subclases de `RestriccionPrograma`.
-> * Nuevas acciones de revisión: nuevas implementaciones de `AccionRevisionPrograma`.
-> * Nuevos observers: implementás `ObserverNuevoPrograma` y los agregás a la grilla.
-
-Esto demuestra que el sistema está **preparado para el cambio**, algo esencial en entornos como el de programación de TV.
-
----
-
 ### 🔷 **5. Algunas posibles mejoras futuras (para mostrar proactividad)**
 
-* **Encapsular `titulo` en un Value Object** que exponga `primeraPalabra()` y `segundaPalabra()` (evitando lógica de split suelta).
-* **Agregar tests automáticos unitarios y de integración**, que serán fáciles de escribir por el bajo acoplamiento.
 * **Extraer `ProgramaFactory`** para evitar duplicación de lógica al crear nuevos programas (como en `PartirProgramaEn2` y `FusionarPrograma`).
 * **Agregar un `LoggerObserver`** para auditar qué acciones se ejecutaron durante una revisión.
 
