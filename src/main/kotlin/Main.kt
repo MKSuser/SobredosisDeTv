@@ -180,6 +180,23 @@ class FusionarPrograma : AccionRevisionPrograma {
 
 }
 
+/************************/
+class MoverProgramaDeDia : AccionRevisionPrograma {
+    override fun ejecutar(programa: Programa, grilla: Grilla) {
+        programa.dias = programa.dias.map { siguienteDia(it) }.toMutableList()
+    }
+
+    fun siguienteDia(dia: DayOfWeek): DayOfWeek = when (dia) {
+        DayOfWeek.MONDAY -> DayOfWeek.TUESDAY
+        DayOfWeek.TUESDAY -> DayOfWeek.WEDNESDAY
+        DayOfWeek.WEDNESDAY -> DayOfWeek.THURSDAY
+        DayOfWeek.THURSDAY -> DayOfWeek.FRIDAY
+        DayOfWeek.FRIDAY -> DayOfWeek.SATURDAY
+        DayOfWeek.SATURDAY -> DayOfWeek.SUNDAY
+        DayOfWeek.SUNDAY -> DayOfWeek.MONDAY
+    }
+}
+
 /***************************************************************************************************************/
 class Grilla {
     val programas = mutableListOf<Programa>()
