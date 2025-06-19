@@ -64,7 +64,7 @@ abstract class RestriccionPrograma {
     }
 }
 
-class MinimoRating(var promedioMinimo: Double) : RestriccionPrograma() {
+class MinimoDeRating(var promedioMinimo: Double) : RestriccionPrograma() {
     override fun seCumple(programa: Programa) =
         programa.promedioDeRatings() > promedioMinimo
 }
@@ -204,7 +204,7 @@ class Grilla {
     fun siguientePrograma(programa: Programa): Programa {
         val indicePrograma = programas.indexOf(programa)
 
-        return if (programas.size > indicePrograma)
+        return if ((programas.size - 1) > indicePrograma)
             programas[indicePrograma + 1] else programas[0]
     }
 
